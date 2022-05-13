@@ -1,0 +1,6 @@
+{
+    "files.associations": {
+        "gcm.h": "c",
+        "fsae_adc.h": "c"
+    }
+}
