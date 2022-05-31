@@ -52,13 +52,13 @@ const double gear_ratio[7] = {1.0, 2.583, 2.000, 1.667, 1.444, 1.286, 1.150};
 
 /* CAN timing constants */
 // Interval for sending diagnostic CAN message
-#define DIAG_CAN_SEND_INTERVAL 1000
+#define DIAG_CAN_SEND_INTERVAL 5000
 // Interval for sending state CAN message
-#define STATE_CAN_SEND_INTERVAL 10
+#define STATE_CAN_SEND_INTERVAL 20
 // Interval for sending ECU gearcut CAN message
 #define MS6_GEARCUT_CAN_SEND_INTERVAL 1
 // Interval for sending autoupshifting state CAN message
-#define AUTOUPSHIFTING_STATUS_CAN_SEND_INTERVAL 250
+#define AUTOUPSHIFTING_STATUS_CAN_SEND_INTERVAL 20
 
 // Interval for diagnosing stale CAN bus
 #define CAN_STALE_INTERVAL 10000
@@ -67,6 +67,10 @@ const double gear_ratio[7] = {1.0, 2.583, 2.000, 1.667, 1.444, 1.286, 1.150};
 #define PADDLE_LOCKOUT_DURATION 25
 #define MAX_SHIFT_DURATION 300
 #define RELAX_WAIT_DURATION 10
+#define AUTOUPSHIFTING_LOCKOUT_DURATION 250
+
+// Comment to disable sending gearcut message over CAN
+// #define SEND_GEARCUT_CAN
 
 /* Paddle switches */
 // Debounced shift paddle states, unpacked

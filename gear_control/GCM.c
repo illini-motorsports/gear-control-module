@@ -43,15 +43,15 @@ volatile int16_t eng_rpm = 0;
 volatile uint8_t auto_upshift_switch = 0;
 volatile double wheel_speed = 0.0;
 // Shift RPMs for 1-->2, 2-->3, 3-->4, 4-->5, 5-->6, 6-->???
-int16_t upshift_target_rpms[6] = {20001, 20002, 20003, 20004, 20005, 20006};
+volatile int16_t upshift_target_rpms[6] = {20001, 20002, 20003,
+                                           20004, 20005, 20006};
 
 // Shift speeds for 1-->2, 2-->3, 3-->4, 4-->5, 5-->6, 6-->???
-double upshift_target_speeds[6] = {101, 102, 103, 104, 105};
+volatile double upshift_target_speeds[6] = {101, 102, 103, 104, 105};
 
 // Ignition cut flags
 volatile uint8_t ignition_cut_upshift = IGNITION_CUT_DISABLE;
 volatile uint8_t ignition_cut_downshift = IGNITION_CUT_DISABLE;
-static uint8_t ignition_cut = 0;
 
 // Timing
 volatile uint32_t paddle_debounce_timer = 0;
@@ -61,6 +61,8 @@ volatile uint32_t temp_sample_timer = 0;
 volatile uint32_t gear_sample_timer = 0;
 
 volatile uint32_t actuator_fire_timer = 0;
+
+volatile uint32_t autoupshifting_lockout_timer = 0;
 
 volatile uint32_t CAN_receive_timer = 0;
 volatile uint32_t ignition_cut_can_send_timer = 0;
@@ -311,10 +313,6 @@ void sample_gear_position(void) {
  * @param msg The received CAN message
  */
 void process_CAN_messages(CAN_message msg) { // Add brake pressure #CHECK
-  uint16_t *lsbArray = (uint16_t *)msg.data;
-
-  uint8_t switch_bitmap;
-  uint8_t button_bitmap;
 
   switch (msg.id) {
   case ECU_AUTOUPSHIFTING_ID:
@@ -327,7 +325,7 @@ void process_CAN_messages(CAN_message msg) { // Add brake pressure #CHECK
 
     auto_upshift_switch = msg.data[4];
 
-        break;
+    break;
 
   case ECU_AUTOUPSHIFTING_TARGETS_1:
     for (uint8_t i = 0; i < 4; i++) {
@@ -416,6 +414,10 @@ void send_state_can(override_t override) {
  * @param override - Whether to override the interval
  */
 void send_ignition_cut_status_can(override_t override) {
+#ifdef SEND_GEARCUT_CAN
+  // Shift signals were moved to analog as of 5/31/2022,
+  // so we no longer need to send this message to the ECU.
+
   static CAN_data data = {0};
   if (override ||
       millis - ignition_cut_can_send_timer >= MS6_GEARCUT_CAN_SEND_INTERVAL) {
@@ -423,6 +425,7 @@ void send_ignition_cut_status_can(override_t override) {
     CAN_send_message(MS6_GEARCUT_CAN_ID, 8, data);
     ignition_cut_can_send_timer = millis;
   }
+#endif
 }
 
 void send_autoupshifting_status_can() {
@@ -624,9 +627,14 @@ void process_auto_upshift(void) {
   if (eng_rpm >= get_target_upshift_rpm() &&       // RPM threshold
       wheel_speed >= get_target_upshift_speed() && // Speed threshold
       queue_up == 0 &&                             // Not already shifting
-      gear < 6                                     // Not trying to get past 6th
+      gear < 6 &&                                  // Not trying to get past 6th
+      (millis - autoupshifting_lockout_timer) >=
+          AUTOUPSHIFTING_LOCKOUT_DURATION // Didn't just auto upshift
+
   ) {
+    queue_dn = 0;
     queue_up = 1;
+    autoupshifting_lockout_timer = millis;
   }
 }
 
@@ -737,7 +745,7 @@ void update_gcm_mode(void) {
   if ((millis - CAN_receive_timer) < CAN_STALE_INTERVAL) {
     mode = auto_upshift_switch ? AUTO_UPSHIFTING : NORMAL;
   } else {
-    mode = auto_upshift_switch;
+    mode = NORMAL;
   }
 }
 
@@ -781,7 +789,7 @@ void main_loop_misc(void) {
  */
 void debounce_shift_inputs(void) {
   // Held shift value
-  static uint8_t shift_prev = 0;
+  static volatile uint8_t shift_prev = 0;
 
   // Packed 8-bit value of all shift switch states
   uint8_t shift_raw = 0x0 | (!SHIFT_UP_PORT) << 2 | (!SHIFT_DN_PORT) << 1 |
