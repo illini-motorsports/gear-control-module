@@ -62,6 +62,7 @@ const double gear_ratio[7] = {1.0, 2.583, 2.000, 1.667, 1.444, 1.286, 1.150};
 
 // Interval for diagnosing stale CAN bus
 #define CAN_STALE_INTERVAL 10000
+#define CAN_MODE_MSG_STALE_INTERVAL 1000
 
 /* Shift control loop constants */
 #define PADDLE_LOCKOUT_DURATION 25
@@ -95,7 +96,8 @@ const double gear_ratio[7] = {1.0, 2.583, 2.000, 1.667, 1.444, 1.286, 1.150};
 #define MS6_GEARCUT_CAN_ID 0x610
 
 // Receiving
-#define ECU_AUTOUPSHIFTING_ID 0x3FB
+#define ECU_AUTOUPSHIFTING_1_ID 0x3FB
+#define ECU_AUTOUPSHIFTING_2_ID 0x3FC
 #define ECU_AUTOUPSHIFTING_TARGETS_1 0x250
 #define ECU_AUTOUPSHIFTING_TARGETS_2 0x251
 #define ECU_AUTOUPSHIFTING_TARGETS_3 0x252

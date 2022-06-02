@@ -40,7 +40,7 @@ volatile uint8_t queue_nt = 0;
 volatile int16_t eng_rpm = 0;
 
 // Auto-upshifting
-volatile uint8_t auto_upshift_switch = 0;
+volatile uint8_t autoupshift_switch = 0;
 volatile double wheel_speed = 0.0;
 // Shift RPMs for 1-->2, 2-->3, 3-->4, 4-->5, 5-->6, 6-->???
 volatile int16_t upshift_target_rpms[6] = {20001, 20002, 20003,
@@ -65,6 +65,7 @@ volatile uint32_t actuator_fire_timer = 0;
 volatile uint32_t autoupshifting_lockout_timer = 0;
 
 volatile uint32_t CAN_receive_timer = 0;
+volatile uint32_t CAN_mode_message_receive_timer = 0;
 volatile uint32_t ignition_cut_can_send_timer = 0;
 volatile uint32_t diag_can_send_timer = 0;
 volatile uint32_t state_can_send_timer = 0;
@@ -315,7 +316,7 @@ void sample_gear_position(void) {
 void process_CAN_messages(CAN_message msg) { // Add brake pressure #CHECK
 
   switch (msg.id) {
-  case ECU_AUTOUPSHIFTING_ID:
+  case ECU_AUTOUPSHIFTING_1_ID:
     wheel_speed =
         ((double)((((uint32_t)msg.data[1]) << 8) | msg.data[0])) * 0.01;
 
@@ -323,7 +324,16 @@ void process_CAN_messages(CAN_message msg) { // Add brake pressure #CHECK
         (int16_t)(((double)((((uint32_t)msg.data[3]) << 8) | msg.data[2])) *
                   1.0);
 
-    auto_upshift_switch = msg.data[4];
+    CAN_receive_timer = millis;
+
+    break;
+
+  case ECU_AUTOUPSHIFTING_2_ID:
+
+    autoupshift_switch = msg.data[0];
+
+    CAN_receive_timer = millis;
+    CAN_mode_message_receive_timer = millis;
 
     break;
 
@@ -332,6 +342,9 @@ void process_CAN_messages(CAN_message msg) { // Add brake pressure #CHECK
       upshift_target_rpms[i] =
           (int16_t)((((uint32_t)msg.data[(i * 2) + 1]) << 8) | msg.data[i * 2]);
     }
+
+    CAN_receive_timer = millis;
+
     break;
 
   case ECU_AUTOUPSHIFTING_TARGETS_2:
@@ -341,6 +354,9 @@ void process_CAN_messages(CAN_message msg) { // Add brake pressure #CHECK
                     msg.data[i * 2])) *
           0.01;
     }
+
+    CAN_receive_timer = millis;
+
     break;
 
   case ECU_AUTOUPSHIFTING_TARGETS_3:
@@ -349,13 +365,14 @@ void process_CAN_messages(CAN_message msg) { // Add brake pressure #CHECK
 
     upshift_target_speeds[4] =
         ((double)((((uint32_t)msg.data[3]) << 8) | msg.data[2])) * 0.01;
+
+    CAN_receive_timer = millis;
+
     break;
 
   default:
     break;
   }
-
-  CAN_receive_timer = millis;
 }
 
 /**
@@ -742,8 +759,8 @@ void do_shift(shift_direction_t direction) {
  * Makes sure the mode defaults to normal if the CAN bus is stale.
  */
 void update_gcm_mode(void) {
-  if ((millis - CAN_receive_timer) < CAN_STALE_INTERVAL) {
-    mode = auto_upshift_switch ? AUTO_UPSHIFTING : NORMAL;
+  if ((millis - CAN_mode_message_receive_timer) < CAN_MODE_MSG_STALE_INTERVAL) {
+    mode = autoupshift_switch ? AUTO_UPSHIFTING : NORMAL;
   } else {
     mode = NORMAL;
   }
