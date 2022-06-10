@@ -17,6 +17,7 @@
 #include <sys/types.h>
 
 /* Types */
+
 // Enum for interval override control
 typedef enum { NO_OVERRIDE = 0, OVERRIDE = 1 } override_t;
 // Generic enum for defining shift up/down
@@ -25,25 +26,18 @@ typedef enum { SHIFT_UP, SHIFT_DOWN } shift_direction_t;
 typedef enum { NORMAL = 0, AUTO_UPSHIFTING = 1 } gcm_mode_t;
 
 /* Gear Thresholds */
+
 // ECU ADC SEES DIFFERENT VOLTAGES FOR SOME REASON
 // TUNE THESE CUTOFFS INDEPENDENTLY FOR BOTH DEVICES
 
-const double gear_voltage_thresholds[7] = {1.20,  0.78, 1.55, 2.35,
-                                           3.035, 3.74, 4.44};
+// These voltage thresholds are coded as [low, high] pairs for each gear
+#define N_GEAR_VOLTAGE_THRESHOLDS 7
 
-const double gear_voltage_low_thresholds[7] = {0.99,   0,      1.375, 1.95,
-                                               2.6925, 3.5225, 4.09};
-const double gear_voltage_high_thresholds[7] = {1.375,  0.99, 1.95, 2.6925,
-                                                3.5225, 4.09, 6};
+const double gear_voltage_low_thresholds[N_GEAR_VOLTAGE_THRESHOLDS] = {
+    0.99, 0, 1.375, 1.95, 2.6925, 3.5225, 4.09};
 
-/*#define GEAR_VOLT_1 0.78
-#define GEAR_VOLT_NEUT 1.20
-#define GEAR_VOLT_2 1.55
-#define GEAR_VOLT_3 2.35
-#define GEAR_VOLT_4 3.035
-#define GEAR_VOLT_5 3.74
-#define GEAR_VOLT_6 4.44
-#define GEAR_VOLT_RIPPLE 0.2*/
+const double gear_voltage_high_thresholds[N_GEAR_VOLTAGE_THRESHOLDS] = {
+    1.375, 0.99, 1.95, 2.6925, 3.5225, 4.09, 6};
 
 #define GEAR_NEUT 0
 #define GEAR_FAIL 7
@@ -52,6 +46,7 @@ const double gear_voltage_high_thresholds[7] = {1.375,  0.99, 1.95, 2.6925,
 const double gear_ratio[7] = {1.0, 2.583, 2.000, 1.667, 1.444, 1.286, 1.150};
 
 /* Sample timing constants (ms) */
+
 // Debounce time for paddle inputs
 #define SHIFT_DEBOUNCE_INTERVAL 10
 // Sample time for internal temperature sensors
@@ -60,6 +55,7 @@ const double gear_ratio[7] = {1.0, 2.583, 2.000, 1.667, 1.444, 1.286, 1.150};
 #define GEAR_SAMPLE_INTERVAL 5
 
 /* CAN timing constants */
+
 // Interval for sending diagnostic CAN message
 #define DIAG_CAN_SEND_INTERVAL 5000
 // Interval for sending state CAN message
@@ -74,15 +70,17 @@ const double gear_ratio[7] = {1.0, 2.583, 2.000, 1.667, 1.444, 1.286, 1.150};
 #define CAN_MODE_MSG_STALE_INTERVAL 1000
 
 /* Shift control loop constants */
+
 #define PADDLE_LOCKOUT_DURATION 25
 #define MAX_SHIFT_DURATION 300
 #define RELAX_WAIT_DURATION 10
-#define AUTOUPSHIFTING_LOCKOUT_DURATION 250
+#define AUTOUPSHIFTING_LOCKOUT_DURATION 100
 
 // Comment to disable sending gearcut message over CAN
 // #define SEND_GEARCUT_CAN
 
 /* Paddle switches */
+
 // Debounced shift paddle states, unpacked
 // (use these for everything)
 #define SHIFT_UP_SW (((shift_debounced_packed >> 2) & 0x1))
@@ -90,13 +88,12 @@ const double gear_ratio[7] = {1.0, 2.583, 2.000, 1.667, 1.444, 1.286, 1.150};
 #define SHIFT_NT_SW 0
 
 /* Ignition cut flags */
-#define IGNITION_CUT_UPSHIFT 1
-#define IGNITION_CUT_DOWNSHIFT 2
-#define IGNITION_CUT_ALL 4
+
 #define IGNITION_CUT_ENABLE 1
 #define IGNITION_CUT_DISABLE 0
 
 /* CAN IDs */
+
 // Sending
 #define DIAG_MESSAGE_CAN_ID 0x200
 #define GEAR_MODE_MESSAGE_CAN_ID 0x201
@@ -113,9 +110,6 @@ const double gear_ratio[7] = {1.0, 2.583, 2.000, 1.667, 1.444, 1.286, 1.150};
 
 /* Pin definitions */
 
-// neut = a5
-// up = e5
-// down = g15
 #define SHIFT_NT_TRIS TRISEbits.TRISE5
 #define SHIFT_NT_ANSEL ANSELEbits.ANSE5
 #define SHIFT_NT_PORT PORTEbits.RE5

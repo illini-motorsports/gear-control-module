@@ -37,23 +37,32 @@ volatile uint8_t prev_switch_dn = 0;
 volatile uint8_t queue_up = 0;
 volatile uint8_t queue_dn = 0;
 volatile uint8_t queue_nt = 0;
-volatile int16_t eng_rpm = 0;
 
 // Auto-upshifting
 volatile uint8_t autoupshift_switch = 0;
+
 volatile double wheel_speed = 0.0;
+volatile int16_t eng_rpm = 0;
+
 // Shift RPMs for 1-->2, 2-->3, 3-->4, 4-->5, 5-->6, 6-->???
-volatile int16_t upshift_target_rpms[6] = {20001, 20002, 20003,
-                                           20004, 20005, 20006};
+// These can be set via CAN
+volatile uint16_t upshift_target_rpms[6] = {20001, 20002, 20003,
+                                            20004, 20005, 20006};
 
 // Shift speeds for 1-->2, 2-->3, 3-->4, 4-->5, 5-->6, 6-->???
+// These can be set via CAN
 volatile double upshift_target_speeds[6] = {101, 102, 103, 104, 105};
+
+// Shift RPM and speed delay adjustments
+// These can be set via CAN
+volatile uint8_t eng_rpm_delay_adjustment = 0;
+volatile float wheel_speed_delay_adjustment = 0.0;
 
 // Ignition cut flags
 volatile uint8_t ignition_cut_upshift = IGNITION_CUT_DISABLE;
 volatile uint8_t ignition_cut_downshift = IGNITION_CUT_DISABLE;
 
-// Timing
+// Timers
 volatile uint32_t paddle_debounce_timer = 0;
 volatile uint32_t paddle_lockout_timer = 0;
 
@@ -64,7 +73,6 @@ volatile uint32_t actuator_fire_timer = 0;
 
 volatile uint32_t autoupshifting_lockout_timer = 0;
 
-volatile uint32_t CAN_receive_timer = 0;
 volatile uint32_t CAN_mode_message_receive_timer = 0;
 volatile uint32_t ignition_cut_can_send_timer = 0;
 volatile uint32_t diag_can_send_timer = 0;
@@ -283,8 +291,8 @@ void sample_gear_position(void) {
     // Convert ADC reading to raw voltage
     gear_voltage = ((((double)gear_samp) / 4095.0) * 5.0);
 
-    // Compute actual gear position
-    for (uint8_t i = 0; i < 7; i++) {
+    // Compute actual gear position from thresholds
+    for (uint8_t i = 0; i < N_GEAR_VOLTAGE_THRESHOLDS; i++) {
       double low = gear_voltage_low_thresholds[i];
       double high = gear_voltage_high_thresholds[i];
       if (gear_voltage > low && gear_voltage <= high) {
@@ -292,26 +300,6 @@ void sample_gear_position(void) {
         break;
       }
     }
-
-    /*
-    if (abs(gear_voltage - GEAR_VOLT_1) <= GEAR_VOLT_RIPPLE) {
-      gear = 1;
-    } else if (abs(gear_voltage - GEAR_VOLT_NEUT) <= GEAR_VOLT_RIPPLE) {
-      gear = GEAR_NEUT;
-    } else if (abs(gear_voltage - GEAR_VOLT_2) <= GEAR_VOLT_RIPPLE) {
-      gear = 2;
-    } else if (abs(gear_voltage - GEAR_VOLT_3) <= GEAR_VOLT_RIPPLE) {
-      gear = 3;
-    } else if (abs(gear_voltage - GEAR_VOLT_4) <= GEAR_VOLT_RIPPLE) {
-      gear = 4;
-    } else if (abs(gear_voltage - GEAR_VOLT_5) <= GEAR_VOLT_RIPPLE) {
-      gear = 5;
-    } else if (abs(gear_voltage - GEAR_VOLT_6) <= GEAR_VOLT_RIPPLE) {
-      gear = 6;
-    } else {
-      gear = GEAR_FAIL;
-    }
-    */
 
     gear_sample_timer = millis;
   }
@@ -324,9 +312,10 @@ void sample_gear_position(void) {
  *
  * @param msg The received CAN message
  */
-void process_CAN_messages(CAN_message msg) { // Add brake pressure #CHECK
+void process_CAN_messages(CAN_message msg) {
 
   switch (msg.id) {
+
   case ECU_AUTOUPSHIFTING_1_ID:
     wheel_speed =
         ((double)((((uint32_t)msg.data[1]) << 8) | msg.data[0])) * 0.01;
@@ -335,15 +324,12 @@ void process_CAN_messages(CAN_message msg) { // Add brake pressure #CHECK
         (int16_t)(((double)((((uint32_t)msg.data[3]) << 8) | msg.data[2])) *
                   1.0);
 
-    CAN_receive_timer = millis;
-
     break;
 
   case ECU_AUTOUPSHIFTING_2_ID:
 
     autoupshift_switch = msg.data[0];
 
-    CAN_receive_timer = millis;
     CAN_mode_message_receive_timer = millis;
 
     break;
@@ -353,8 +339,6 @@ void process_CAN_messages(CAN_message msg) { // Add brake pressure #CHECK
       upshift_target_rpms[i] =
           (int16_t)((((uint32_t)msg.data[(i * 2) + 1]) << 8) | msg.data[i * 2]);
     }
-
-    CAN_receive_timer = millis;
 
     break;
 
@@ -366,8 +350,6 @@ void process_CAN_messages(CAN_message msg) { // Add brake pressure #CHECK
           0.01;
     }
 
-    CAN_receive_timer = millis;
-
     break;
 
   case ECU_AUTOUPSHIFTING_TARGETS_3:
@@ -377,7 +359,8 @@ void process_CAN_messages(CAN_message msg) { // Add brake pressure #CHECK
     upshift_target_speeds[4] =
         ((double)((((uint32_t)msg.data[3]) << 8) | msg.data[2])) * 0.01;
 
-    CAN_receive_timer = millis;
+    eng_rpm_delay_adjustment = msg.data[4];
+    wheel_speed_delay_adjustment = ((float)msg.data[5]) * 0.01;
 
     break;
 
@@ -623,27 +606,29 @@ uint8_t check_shift_conditions(shift_direction_t direction) {
 /**
  * Gets the target up shifting RPM for autoupshifting
  * @param gear current vehicle gear
- * @return target shift RPM for gear
+ * @return target shift RPM for gear, adjusted for delay
  */
 int16_t get_target_upshift_rpm(void) {
   if (gear == GEAR_FAIL) {
     return 20000; // If invalid gear, make sure we never shift
   }
 
-  return upshift_target_rpms[gear == GEAR_NEUT ? gear : gear - 1];
+  return upshift_target_rpms[gear == GEAR_NEUT ? gear : gear - 1] -
+         eng_rpm_delay_adjustment;
 }
 
 /**
  * Gets the target up shifting speed for autoupshifting
  * @param gear current vehicle gear
- * @return target speed for gear
+ * @return target speed for gear, adjusted for delay
  */
 double get_target_upshift_speed(void) {
   if (gear == GEAR_FAIL) {
-    return 200.0;
+    return 200.0; // If invalid gear, make sure we never shift
   }
 
-  return upshift_target_speeds[gear == GEAR_NEUT ? gear : gear - 1];
+  return upshift_target_speeds[gear == GEAR_NEUT ? gear : gear - 1] -
+         wheel_speed_delay_adjustment;
 }
 
 void process_auto_upshift(void) {
@@ -712,9 +697,9 @@ void do_shift(shift_direction_t direction) {
 
   // Transmit ignition cut indicator to ECU
   if (direction == SHIFT_UP) {
-    ignition_cut_upshift = 1;
+    ignition_cut_upshift = IGNITION_CUT_ENABLE;
   } else if (SHIFT_DOWN) {
-    ignition_cut_downshift = 1;
+    ignition_cut_downshift = IGNITION_CUT_ENABLE;
   }
   send_ignition_cut_status_can(OVERRIDE);
 
@@ -752,8 +737,8 @@ void do_shift(shift_direction_t direction) {
   }
 
   // Relax ignition cut
-  ignition_cut_upshift = 0;
-  ignition_cut_downshift = 0;
+  ignition_cut_upshift = IGNITION_CUT_DISABLE;
+  ignition_cut_downshift = IGNITION_CUT_DISABLE;
   send_ignition_cut_status_can(OVERRIDE);
 
   // Send new state on CAN
