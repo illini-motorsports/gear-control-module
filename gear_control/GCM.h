@@ -26,15 +26,24 @@ typedef enum { NORMAL = 0, AUTO_UPSHIFTING = 1 } gcm_mode_t;
 
 /* Gear Thresholds */
 // ECU ADC SEES DIFFERENT VOLTAGES FOR SOME REASON
-// TUNE THESE CUTOFFS INDEPENDENTLY FOR BOTH DEVICES!
-#define GEAR_VOLT_1 0.72
-#define GEAR_VOLT_NEUT 1.05
-#define GEAR_VOLT_2 1.45
-#define GEAR_VOLT_3 2.20
-#define GEAR_VOLT_4 2.97
+// TUNE THESE CUTOFFS INDEPENDENTLY FOR BOTH DEVICES
+
+const double gear_voltage_thresholds[7] = {1.20,  0.78, 1.55, 2.35,
+                                           3.035, 3.74, 4.44};
+
+const double gear_voltage_low_thresholds[7] = {0.99,   0,      1.375, 1.95,
+                                               2.6925, 3.5225, 4.09};
+const double gear_voltage_high_thresholds[7] = {1.375,  0.99, 1.95, 2.6925,
+                                                3.5225, 4.09, 6};
+
+/*#define GEAR_VOLT_1 0.78
+#define GEAR_VOLT_NEUT 1.20
+#define GEAR_VOLT_2 1.55
+#define GEAR_VOLT_3 2.35
+#define GEAR_VOLT_4 3.035
 #define GEAR_VOLT_5 3.74
-#define GEAR_VOLT_6 4.54
-#define GEAR_VOLT_RIPPLE 0.3
+#define GEAR_VOLT_6 4.44
+#define GEAR_VOLT_RIPPLE 0.2*/
 
 #define GEAR_NEUT 0
 #define GEAR_FAIL 7

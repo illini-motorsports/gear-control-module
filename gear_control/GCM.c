@@ -284,6 +284,16 @@ void sample_gear_position(void) {
     gear_voltage = ((((double)gear_samp) / 4095.0) * 5.0);
 
     // Compute actual gear position
+    for (uint8_t i = 0; i < 7; i++) {
+      double low = gear_voltage_low_thresholds[i];
+      double high = gear_voltage_high_thresholds[i];
+      if (gear_voltage > low && gear_voltage <= high) {
+        gear = i;
+        break;
+      }
+    }
+
+    /*
     if (abs(gear_voltage - GEAR_VOLT_1) <= GEAR_VOLT_RIPPLE) {
       gear = 1;
     } else if (abs(gear_voltage - GEAR_VOLT_NEUT) <= GEAR_VOLT_RIPPLE) {
@@ -301,6 +311,7 @@ void sample_gear_position(void) {
     } else {
       gear = GEAR_FAIL;
     }
+    */
 
     gear_sample_timer = millis;
   }
