@@ -158,7 +158,7 @@ void send_autoupshifting_status_can();
 void process_paddle_press(shift_direction_t);
 uint8_t check_shift_conditions(shift_direction_t);
 
-int16_t get_target_upshift_rpm(void);
+uint16_t get_target_upshift_rpm(void);
 double get_target_upshift_speed(void);
 void process_auto_upshift(void);
 

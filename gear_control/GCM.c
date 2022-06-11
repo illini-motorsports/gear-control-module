@@ -42,7 +42,7 @@ volatile uint8_t queue_nt = 0;
 volatile uint8_t autoupshift_switch = 0;
 
 volatile double wheel_speed = 0.0;
-volatile int16_t eng_rpm = 0;
+volatile uint16_t eng_rpm = 0;
 
 // Shift RPMs for 1-->2, 2-->3, 3-->4, 4-->5, 5-->6, 6-->???
 // These can be set via CAN
@@ -321,8 +321,8 @@ void process_CAN_messages(CAN_message msg) {
         ((double)((((uint32_t)msg.data[1]) << 8) | msg.data[0])) * 0.01;
 
     eng_rpm =
-        (int16_t)(((double)((((uint32_t)msg.data[3]) << 8) | msg.data[2])) *
-                  1.0);
+        (uint16_t)(((double)((((uint32_t)msg.data[3]) << 8) | msg.data[2])) *
+                   1.0);
 
     break;
 
@@ -337,7 +337,8 @@ void process_CAN_messages(CAN_message msg) {
   case ECU_AUTOUPSHIFTING_TARGETS_1:
     for (uint8_t i = 0; i < 4; i++) {
       upshift_target_rpms[i] =
-          (int16_t)((((uint32_t)msg.data[(i * 2) + 1]) << 8) | msg.data[i * 2]);
+          (uint16_t)((((uint32_t)msg.data[(i * 2) + 1]) << 8) |
+                     msg.data[i * 2]);
     }
 
     break;
@@ -354,7 +355,7 @@ void process_CAN_messages(CAN_message msg) {
 
   case ECU_AUTOUPSHIFTING_TARGETS_3:
     upshift_target_rpms[4] =
-        (int16_t)((((uint32_t)msg.data[1]) << 8) | msg.data[0]);
+        (uint16_t)((((uint32_t)msg.data[1]) << 8) | msg.data[0]);
 
     upshift_target_speeds[4] =
         ((double)((((uint32_t)msg.data[3]) << 8) | msg.data[2])) * 0.01;
@@ -447,6 +448,8 @@ void send_autoupshifting_status_can() {
     data.halfword1 = get_target_upshift_rpm();
     data.byte4 = (uint8_t)wheel_speed;
     data.byte5 = (uint8_t)get_target_upshift_speed();
+    data.byte6 = (uint8_t)eng_rpm_delay_adjustment;
+    data.byte7 = (uint8_t)(wheel_speed_delay_adjustment * 100);
 
     CAN_send_message(AUTOUPSHIFTING_STATUS_CAN_ID, 8, data);
 
@@ -608,7 +611,7 @@ uint8_t check_shift_conditions(shift_direction_t direction) {
  * @param gear current vehicle gear
  * @return target shift RPM for gear, adjusted for delay
  */
-int16_t get_target_upshift_rpm(void) {
+uint16_t get_target_upshift_rpm(void) {
   if (gear == GEAR_FAIL) {
     return 20000; // If invalid gear, make sure we never shift
   }
