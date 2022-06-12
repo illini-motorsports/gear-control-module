@@ -135,8 +135,8 @@ const double gear_ratio[7] = {1.0, 2.583, 2.000, 1.667, 1.444, 1.286, 1.150};
 #define ADC_FORCE_CSS ADCCSS1bits.CSS25
 #define ADC_FORCE_CHN 25
 
-#define ACTUATOR_ON 0
-#define ACTUATOR_OFF 1
+#define ACTUATOR_ON 1
+#define ACTUATOR_OFF 0
 
 /* Function definitions */
 
